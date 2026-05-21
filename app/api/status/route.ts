@@ -23,7 +23,14 @@ export async function POST(req: NextRequest) {
       try { await redis.del(CACHE_KEYS.teammates); } catch {}
     }
 
-    return NextResponse.redirect(new URL(`/team/${id}`, req.url), { status: 303 });
+    // Use a relative Location header so we sidestep the 0.0.0.0:8080
+    // host that NextResponse.redirect() would otherwise bake in via
+    // new URL(...). The Embr proxy returns the runtime bind host
+    // (https://0.0.0.0:8080) for req.url, which then leaks to clients.
+    return new Response(null, {
+      status: 303,
+      headers: { Location: `/team/${id}` },
+    });
   } catch (e: any) {
     return NextResponse.json(
       { error: 'update failed', detail: String(e?.message || e), stack: String(e?.stack || '').split('\n').slice(0, 5) },

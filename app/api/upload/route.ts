@@ -28,5 +28,8 @@ export async function POST(req: NextRequest) {
   const redis = getRedis();
   if (redis) await redis.del(CACHE_KEYS.teammates);
 
-  return NextResponse.redirect(new URL(`/team/${teammateId}`, req.url), { status: 303 });
+  return new Response(null, {
+    status: 303,
+    headers: { Location: `/team/${teammateId}` },
+  });
 }
