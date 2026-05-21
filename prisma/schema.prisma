@@ -1,0 +1,22 @@
+// Prisma schema for Embr Pulse — team status board.
+// DATABASE_URL is injected by Embr at runtime (managed Postgres dependency).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Teammate {
+  id        Int      @id @default(autoincrement())
+  name      String
+  role      String
+  status    String   @default("available")
+  message   String?
+  avatarKey String?  // blob storage key (no leading slash)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}

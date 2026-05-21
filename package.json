@@ -5,18 +5,24 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "start": "next start -p 8080 -H 0.0.0.0",
+    "lint": "next lint",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@azure/storage-blob": "^12.31.0",
+    "@prisma/client": "^6.19.3",
+    "ioredis": "^5.10.1",
+    "iron-session": "^8.0.4",
+    "next": "14.2.35",
+    "prisma": "^6.19.3",
     "react": "^18",
-    "react-dom": "^18",
-    "next": "14.2.35"
+    "react-dom": "^18"
   },
   "devDependencies": {
-    "typescript": "^5",
-    "@types/node": "^20",
+    "@types/node": "^20.19.41",
     "@types/react": "^18",
-    "@types/react-dom": "^18"
+    "@types/react-dom": "^18",
+    "typescript": "^5"
   }
 }

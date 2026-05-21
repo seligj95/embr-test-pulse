@@ -1,0 +1,12 @@
+database:
+  enabled: true
+  engine: postgres
+  sync:
+    command: "npx prisma db push --accept-data-loss --skip-generate && node scripts/seed.mjs"
+
+healthCheck:
+  path: /api/health
+
+secrets:
+  - name: SESSION_PASSWORD
+    description: "Iron-session encryption password (≥32 chars). Generate with `openssl rand -base64 48`."
