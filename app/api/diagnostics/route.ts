@@ -35,6 +35,18 @@ export async function GET() {
     checks.blob = { ok: false, error: String(e?.message || e) };
   }
 
+  let blobUrlHost: string | null = null;
+  let blobUrlProtocol: string | null = null;
+  let blobUrlPath: string | null = null;
+  try {
+    if (process.env.EMBR_BLOB_URL) {
+      const u = new URL(process.env.EMBR_BLOB_URL);
+      blobUrlHost = u.host;
+      blobUrlProtocol = u.protocol;
+      blobUrlPath = u.pathname;
+    }
+  } catch {}
+
   checks.env = {
     hasDatabaseUrl: !!process.env.DATABASE_URL,
     hasRedisUrl: !!(process.env.REDIS_URL || process.env.CACHE_URL),
@@ -43,6 +55,10 @@ export async function GET() {
     hasSessionPassword: !!process.env.SESSION_PASSWORD,
     embrAppUrl: process.env.EMBR_APP_URL || null,
     embrAppHostname: process.env.EMBR_APP_HOSTNAME || null,
+    blobUrlHost,
+    blobUrlProtocol,
+    blobUrlPath,
+    blobKeyLen: process.env.EMBR_BLOB_KEY?.length || 0,
   };
 
   const allOk =
