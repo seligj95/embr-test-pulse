@@ -3,8 +3,11 @@ database:
   engine: postgres
   framework: prisma
   schema: prisma/schema.prisma
-  sync: "npx prisma db push --accept-data-loss --skip-generate"
-  seed: "node scripts/seed.mjs"
+  # NOTE: sync is intentionally a no-op here. We push the schema and seed
+  # from the app's start command instead, because the platform's Sync Database
+  # step runs before the localhost:5432 tunnel is active in the app sandbox
+  # (same root cause as issue #969 — Drizzle hit it too).
+  sync: "echo 'sync deferred to app startup — see package.json start script'"
 
 healthCheck:
   path: /api/health
