@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getRedis } from '@/lib/redis';
-import { getContainer } from '@/lib/blob';
+import { blobHealthCheck } from '@/lib/blob';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -29,8 +29,7 @@ export async function GET() {
   }
 
   try {
-    const container = await getContainer();
-    checks.blob = container ? { ok: true, container: 'pulse-uploads' } : { ok: false, reason: 'EMBR_BLOB_URL not set' };
+    checks.blob = await blobHealthCheck();
   } catch (e: any) {
     checks.blob = { ok: false, error: String(e?.message || e) };
   }

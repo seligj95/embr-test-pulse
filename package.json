@@ -10,7 +10,6 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@azure/storage-blob": "^12.31.0",
     "@prisma/client": "^6.19.3",
     "ioredis": "^5.10.1",
     "iron-session": "^8.0.4",

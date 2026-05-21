@@ -1,46 +1,31 @@
 // Embr Blob storage helper.
-// Embr injects:
-//   EMBR_BLOB_URL  — container or service URL (with or without SAS)
-//   EMBR_BLOB_KEY  — storage account key (only when URL is unsigned)
+// Embr exposes blob storage as a REST API on the app's OWN domain at
+// /_embr/blob/{key}. This is NOT Azure Storage SDK compatible — it's a
+// custom proxy intercepted by YARP. Authentication uses Bearer token.
 //
-// We use @azure/storage-blob with the StorageSharedKeyCredential path
-// when EMBR_BLOB_KEY is provided.
-import {
-  BlobServiceClient,
-  ContainerClient,
-  StorageSharedKeyCredential,
-} from '@azure/storage-blob';
+// Embr injects:
+//   EMBR_BLOB_URL  — proxy base URL (always https://<env-domain>/_embr/blob/)
+//   EMBR_BLOB_KEY  — bearer token (required for write/list/delete; reads public)
+//
+// API surface (per src/Embr.Global.Api/docs/storage.md):
+//   PUT    /_embr/blob/{key}   — upload      (auth)
+//   GET    /_embr/blob/{key}   — download    (public)
+//   HEAD   /_embr/blob/{key}   — metadata    (public)
+//   GET    /_embr/blob/        — list        (auth)
+//   DELETE /_embr/blob/{key}   — delete      (auth)
+//
+// NOTE: There is NO @embr/blob SDK yet (deferred per issue #389). All
+// official examples use plain fetch().
 
-const CONTAINER = 'pulse-uploads';
+function baseUrl(): string | null {
+  const url = process.env.EMBR_BLOB_URL;
+  if (!url) return null;
+  return url.endsWith('/') ? url : url + '/';
+}
 
-let cachedContainer: ContainerClient | null = null;
-
-export async function getContainer(): Promise<ContainerClient | null> {
-  if (cachedContainer) return cachedContainer;
-  const blobUrl = process.env.EMBR_BLOB_URL;
-  const blobKey = process.env.EMBR_BLOB_KEY;
-  if (!blobUrl) return null;
-
-  let serviceClient: BlobServiceClient;
-  if (blobKey) {
-    const u = new URL(blobUrl);
-    const accountName = u.host.split('.')[0];
-    serviceClient = new BlobServiceClient(
-      `${u.protocol}//${u.host}`,
-      new StorageSharedKeyCredential(accountName, blobKey),
-    );
-  } else {
-    serviceClient = new BlobServiceClient(blobUrl);
-  }
-
-  const container = serviceClient.getContainerClient(CONTAINER);
-  try {
-    await container.createIfNotExists({ access: 'blob' });
-  } catch {
-    await container.createIfNotExists();
-  }
-  cachedContainer = container;
-  return container;
+function authHeader(): Record<string, string> {
+  const key = process.env.EMBR_BLOB_KEY;
+  return key ? { authorization: `Bearer ${key}` } : {};
 }
 
 export async function uploadAvatar(
@@ -48,15 +33,52 @@ export async function uploadAvatar(
   bytes: Buffer,
   contentType: string,
 ): Promise<string | null> {
-  const container = await getContainer();
-  if (!container) return null;
-  const blob = container.getBlockBlobClient(key);
-  await blob.uploadData(bytes, { blobHTTPHeaders: { blobContentType: contentType } });
-  return blob.url;
+  const base = baseUrl();
+  if (!base) return null;
+  const url = base + encodeURI(key).replace(/^\//, '');
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      ...authHeader(),
+      'content-type': contentType,
+    },
+    body: new Uint8Array(bytes),
+  });
+  if (!res.ok) {
+    throw new Error(`PUT ${url} → ${res.status} ${await res.text().catch(() => '')}`);
+  }
+  return url;
 }
 
 export async function avatarUrl(key: string): Promise<string | null> {
-  const container = await getContainer();
-  if (!container) return null;
-  return container.getBlockBlobClient(key).url;
+  const base = baseUrl();
+  if (!base) return null;
+  return base + encodeURI(key).replace(/^\//, '');
 }
+
+export async function listBlobs(): Promise<unknown[]> {
+  const base = baseUrl();
+  if (!base) return [];
+  const res = await fetch(base, { headers: { ...authHeader() } });
+  if (!res.ok) {
+    throw new Error(`GET ${base} → ${res.status}`);
+  }
+  return res.json();
+}
+
+// Used by /api/diagnostics: a lightweight reachability check that proves the
+// /_embr/blob proxy is responding to authenticated requests. The list endpoint
+// is the cheapest way to verify both routing and auth in one call.
+export async function blobHealthCheck(): Promise<{ ok: boolean; sample?: number; status?: number; error?: string }> {
+  const base = baseUrl();
+  if (!base) return { ok: false, error: 'EMBR_BLOB_URL not set' };
+  try {
+    const res = await fetch(base, { headers: { ...authHeader() } });
+    if (!res.ok) return { ok: false, status: res.status };
+    const items = (await res.json()) as unknown[];
+    return { ok: true, sample: Array.isArray(items) ? items.length : 0 };
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || e) };
+  }
+}
+
