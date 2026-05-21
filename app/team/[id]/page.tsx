@@ -1,23 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
-import { revalidatePath } from 'next/cache';
-import { getRedis, CACHE_KEYS } from '@/lib/redis';
 import { avatarUrl } from '@/lib/blob';
 
 export const dynamic = 'force-dynamic';
-
-async function updateStatus(formData: FormData) {
-  'use server';
-  const id = Number(formData.get('id'));
-  const status = String(formData.get('status') || '').trim();
-  const message = String(formData.get('message') || '').trim() || null;
-  if (!id || !status) return;
-  await prisma.teammate.update({ where: { id }, data: { status, message } });
-  const redis = getRedis();
-  if (redis) await redis.del(CACHE_KEYS.teammates);
-  revalidatePath('/');
-  revalidatePath(`/team/${id}`);
-}
 
 export default async function TeammatePage({ params }: { params: { id: string } }) {
   const id = Number(params.id);
@@ -41,7 +26,7 @@ export default async function TeammatePage({ params }: { params: { id: string } 
           <p style={{ margin: 0, color: '#666' }}>{t.role}</p>
         </div>
       </div>
-      <form action={updateStatus}>
+      <form action="/api/status" method="post">
         <input type="hidden" name="id" value={t.id} />
         <label style={{ display: 'block', marginBottom: '0.5rem' }}>
           Status:
